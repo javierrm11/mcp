@@ -195,10 +195,11 @@ class Query(BaseModel):
 @app.post("/ask")
 async def ask(query: Query):
     try:
-        response = await mcp.run_once(query.prompt)
+        response = await mcp(query.prompt)  # ✅ CORRECTO
         return {"response": response}
     except Exception as e:
         return {"error": str(e)}
+
 
 # -------------------------------
 # Uvicorn: Para Railway
