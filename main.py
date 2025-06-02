@@ -142,7 +142,7 @@ async def tiempoVuelo(vuelo: str) -> str:
 # ------------------------------- VERTEX AI API KEY HTTP -------------------------------
 
 async def gpt_response(prompt: str) -> str:
-    url = f"https://generativelanguage.googleapis.com/v1beta2/models/chat-bison-001:generateText?key={API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/chat-bison-001:generateText?key={API_KEY}"
     data = {
         "prompt": {"text": prompt},
         "temperature": 0.7,
