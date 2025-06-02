@@ -8,7 +8,7 @@ import openai
 from dotenv import load_dotenv
 
 load_dotenv()
-openai.api_key = os.getenv("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")
+openai.api_key = os.getenv("APIKEY")
 
 mcp = FastMCP()
 app = FastAPI()
