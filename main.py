@@ -2,7 +2,7 @@ import asyncio
 from fastapi import FastAPI
 from pydantic import BaseModel
 from mcp.server.fastmcp import FastMCP
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 import uvicorn
 import os
 
@@ -23,31 +23,38 @@ async def avion_mas_rapido(region: str) -> str:
     region_api = region_map.get(region.strip(), region.capitalize())
     url = f"https://api-vuelos-eight.vercel.app/{region_api}"
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        page = await browser.new_page()
-        await page.goto(url)
+    browser = None
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+            await page.goto(url)
 
-        try:
-            await page.wait_for_selector("h2:text('Avión más rápido')", timeout=40000)
-        except:
+            try:
+                await page.wait_for_selector("h2:text('Avión más rápido')", timeout=40000)
+            except PlaywrightTimeoutError:
+                return f"No se encontró el bloque 'Avión más rápido' en la región {region}"
+
+            contenedor = page.locator("h2:text('Avión más rápido')").first.locator("..")
+            hex_linea = await contenedor.locator("p:has-text('Hex:')").text_content()
+            velocidad_linea = await contenedor.locator("p:has-text('Velocidad:')").text_content()
+
+            hex_valor = hex_linea.split("Hex:")[-1].strip()
+            velocidad_valor = velocidad_linea.split("Velocidad:")[-1].strip()
+
+            return f"El avión más rápido en {region} es {hex_valor} con una velocidad de {velocidad_valor}."
+    except Exception as e:
+        return f"Error al obtener el avión más rápido: {str(e)}"
+    finally:
+        if browser:
             await browser.close()
-            return f"No se encontró el bloque 'Avión más rápido' en la región {region}"
 
-        contenedor = page.locator("h2:text('Avión más rápido')").first.locator("..")
-        hex_linea = await contenedor.locator("p:has-text('Hex:')").text_content()
-        velocidad_linea = await contenedor.locator("p:has-text('Velocidad:')").text_content()
-
-        hex_valor = hex_linea.split("Hex:")[-1].strip()
-        velocidad_valor = velocidad_linea.split("Velocidad:")[-1].strip()
-
-        await browser.close()
-        return f"El avión más rápido en {region} es {hex_valor} con una velocidad de {velocidad_valor}."
 
 @mcp.tool()
 async def explica_consumo_emisiones(pregunta: str) -> str:
     pregunta = pregunta.lower()
-    if ("emisiones" in pregunta or "co2" in pregunta or "dioxido" in pregunta) and ("consumo" in pregunta or "gasta" in pregunta or "combustible" in pregunta or "litros" in pregunta):
+    if ("emisiones" in pregunta or "co2" in pregunta or "dioxido" in pregunta) and \
+       ("consumo" in pregunta or "gasta" in pregunta or "combustible" in pregunta or "litros" in pregunta):
         return (
             "Para calcular el consumo de combustible, primero estimamos la resistencia aerodinámica que debe vencer el avión, "
             "la cual depende de la velocidad y la densidad del aire (que varía con la altitud). "
@@ -74,95 +81,96 @@ async def explica_consumo_emisiones(pregunta: str) -> str:
         "Puedes preguntar cosas como: '¿Cómo se calcula el consumo?' o '¿Cuánto CO2 emite un vuelo?'"
     )
 
-@mcp.tool()
-async def origenVuelo(vuelo: str) -> str:
+
+async def obtener_dato_vuelo(vuelo: str, selector: str, timeout=30000) -> str:
     vuelo = vuelo.strip().upper()
     url = f"https://es.flightaware.com/live/flight/{vuelo}"
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        page = await browser.new_page()
-        await page.goto(url)
-        try:
-            await page.wait_for_selector(".flightPageSummaryCity", timeout=30000)
-        except:
+    browser = None
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+            await page.goto(url)
+            await page.wait_for_selector(selector, timeout=timeout)
+            texto = await page.locator(selector).first.text_content()
+            return texto.strip() if texto else "desconocido"
+    except PlaywrightTimeoutError:
+        return None
+    except Exception:
+        return None
+    finally:
+        if browser:
             await browser.close()
-            return f"No se pudo obtener el origen del vuelo {vuelo}."
-        origen = await page.locator(".flightPageSummaryCity").first.text_content()
-        await browser.close()
-        return f"Origen: {origen.strip() if origen else 'desconocido'}"
+
+
+@mcp.tool()
+async def origenVuelo(vuelo: str) -> str:
+    origen = await obtener_dato_vuelo(vuelo, ".flightPageSummaryCity")
+    if origen is None:
+        return f"No se pudo obtener el origen del vuelo {vuelo}."
+    return f"Origen: {origen}"
+
 
 @mcp.tool()
 async def destinoVuelo(vuelo: str) -> str:
-    vuelo = vuelo.strip().upper()
-    url = f"https://es.flightaware.com/live/flight/{vuelo}"
+    destino = await obtener_dato_vuelo(vuelo, ".flightPageSummaryCity")
+    if destino is None:
+        return f"No se pudo obtener el destino del vuelo {vuelo}."
+    return f"Destino: {destino}"
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        page = await browser.new_page()
-        await page.goto(url)
-        try:
-            await page.wait_for_selector(".flightPageSummaryCity", timeout=30000)
-        except:
-            await browser.close()
-            return f"No se pudo obtener el destino del vuelo {vuelo}."
-        destino = await page.locator(".flightPageSummaryCity").first.text_content()
-        await browser.close()
-        return f"Destino: {destino.strip() if destino else 'desconocido'}"
 
 @mcp.tool()
 async def trackVuelo(vuelo: str) -> str:
     vuelo = vuelo.strip().upper()
     url = f"https://es.flightaware.com/live/flight/{vuelo}"
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        page = await browser.new_page()
-        await page.goto(url)
-        try:
+    browser = None
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+            await page.goto(url)
             await page.wait_for_selector(".flightPageSummaryCity", timeout=30000)
             await page.wait_for_selector(".destinationCity", timeout=30000)
-        except:
+            origen = await page.locator(".flightPageSummaryCity").first.text_content()
+            destino = await page.locator(".destinationCity").first.text_content()
+            origen = origen.strip() if origen else "desconocido"
+            destino = destino.strip() if destino else "desconocido"
+            return f"Origen: {origen} - Destino: {destino}"
+    except PlaywrightTimeoutError:
+        return f"No se pudo obtener el track del vuelo {vuelo}."
+    except Exception as e:
+        return f"Error al obtener el track del vuelo: {str(e)}"
+    finally:
+        if browser:
             await browser.close()
-            return f"No se pudo obtener el track del vuelo {vuelo}."
-        origen = await page.locator(".flightPageSummaryCity").first.text_content()
-        destino = await page.locator(".destinationCity").first.text_content()
-        await browser.close()
-        return f"Origen: {origen.strip() if origen else 'desconocido'} - Destino: {destino.strip() if destino else 'desconocido'}"
+
 
 @mcp.tool()
 async def tiempoVuelo(vuelo: str) -> str:
-    vuelo = vuelo.strip().upper()
-    url = f"https://es.flightaware.com/live/flight/{vuelo}"
+    tiempo = await obtener_dato_vuelo(vuelo, ".flightPageProgressTotal strong")
+    if tiempo is None:
+        return f"No se pudo obtener el tiempo del vuelo {vuelo}."
+    return f"Tiempo total de vuelo: {tiempo}"
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        page = await browser.new_page()
-        await page.goto(url)
-        try:
-            await page.wait_for_selector(".flightPageProgressTotal strong", timeout=30000)
-        except:
-            await browser.close()
-            return f"No se pudo obtener el tiempo del vuelo {vuelo}."
-        tiempo = await page.locator(".flightPageProgressTotal strong").first.text_content()
-        await browser.close()
-        return f"Tiempo total de vuelo: {tiempo.strip() if tiempo else 'desconocido'}"
 
 # ------------------------------- ENDPOINT /ask -------------------------------
 
 class Query(BaseModel):
     prompt: str
 
+
 @app.post("/ask")
 async def ask(query: Query):
     try:
-        response = await mcp.run(query.prompt)  # ✅ CORREGIDO
+        response = await mcp.run(query.prompt)
         return {"response": response}
     except Exception as e:
         return {"error": str(e)}
+
 
 # ------------------------------- UVICORN para Railway -------------------------------
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="127.0.0.1", port=port, reload=True)
+    # IMPORTANTE: Para Railway y producción usar host="0.0.0.0"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
