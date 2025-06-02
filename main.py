@@ -10,7 +10,7 @@ import httpx  # para llamadas a la API de Vertex AI
 load_dotenv()
 
 # Clave de API de Vertex AI
-API_KEY = os.getenv("GOOGLE_API_KEY")  # agrega esta clave en tu .env
+API_KEY = "AIzaSyAa6VPP3RlcL6Jsy72skb7l2KSIuvF9r80"
 
 mcp = FastMCP()
 app = FastAPI()
