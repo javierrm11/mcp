@@ -11,7 +11,7 @@ app = FastAPI()
 
 # ------------------------------- HERRAMIENTAS -------------------------------
 
-@mcp.tool()
+@mcp.tool(name="avion_mas_rapido")
 async def avion_mas_rapido(region: str) -> str:
     region_map = {
         "España": "Spain", "Europa": "Europe", "América": "America", "America": "America",
