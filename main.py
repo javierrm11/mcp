@@ -4,11 +4,14 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from mcp.server.fastmcp import FastMCP
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
-import openai
+from google.ai import generativelanguage as generativelanguage
+from google.ai.generativelanguage import types
 from dotenv import load_dotenv
 
 load_dotenv()
-openai.api_key = os.getenv("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")
+
+# Cliente de Vertex AI Generative Language
+client = generativelanguage.GenerationServiceClient()
 
 mcp = FastMCP()
 app = FastAPI()
@@ -137,22 +140,21 @@ async def tiempoVuelo(vuelo: str) -> str:
     return f"Tiempo total de vuelo: {tiempo}"
 
 
-# ------------------------------- GPT FALLBACK -------------------------------
+# ------------------------------- VERTEX AI FALLBACK -------------------------------
 
 async def gpt_response(prompt: str) -> str:
+    loop = asyncio.get_event_loop()
     try:
-        response = await openai.chat.completions.acreate(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Responde de forma clara y técnica si es posible."},
-                {"role": "user", "content": prompt}
-            ],
+        response = await loop.run_in_executor(None, lambda: client.generate_text(
+            model="models/chat-bison-001",
+            prompt=types.TextPrompt(text=prompt),
             temperature=0.7,
-            max_tokens=500
-        )
-        return response.choices[0].message.content.strip()
+            max_output_tokens=500,
+        ))
+        return response.candidates[0].output.strip()
     except Exception as e:
-        return f"Error al consultar GPT: {str(e)}"
+        return f"Error al consultar Vertex AI: {str(e)}"
+
 
 # ------------------------------- API /ask -------------------------------
 
@@ -188,6 +190,7 @@ async def ask(query: Query):
             return {"response": gpt_reply}
     except Exception as e:
         return {"error": str(e)}
+
 
 # ------------------------------- SERVIDOR -------------------------------
 
