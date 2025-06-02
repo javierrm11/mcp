@@ -9,9 +9,8 @@ import os
 mcp = FastMCP()
 app = FastAPI()
 
-# -------------------------------
-# Herramienta: Avión más rápido
-# -------------------------------
+# ------------------------------- HERRAMIENTAS -------------------------------
+
 @mcp.tool()
 async def avion_mas_rapido(region: str) -> str:
     region_map = {
@@ -21,8 +20,7 @@ async def avion_mas_rapido(region: str) -> str:
         "África": "Africa", "Africa": "Africa", "Asia": "Asia",
         "Oceanía": "Oceania", "Oceania": "Oceania",
     }
-    region_key = region.strip()
-    region_api = region_map.get(region_key, region_key.capitalize())
+    region_api = region_map.get(region.strip(), region.capitalize())
     url = f"https://api-vuelos-eight.vercel.app/{region_api}"
 
     async with async_playwright() as p:
@@ -36,9 +34,7 @@ async def avion_mas_rapido(region: str) -> str:
             await browser.close()
             return f"No se encontró el bloque 'Avión más rápido' en la región {region}"
 
-        titulo = page.locator("h2:text('Avión más rápido')").first
-        contenedor = titulo.locator("..")
-
+        contenedor = page.locator("h2:text('Avión más rápido')").first.locator("..")
         hex_linea = await contenedor.locator("p:has-text('Hex:')").text_content()
         velocidad_linea = await contenedor.locator("p:has-text('Velocidad:')").text_content()
 
@@ -46,18 +42,12 @@ async def avion_mas_rapido(region: str) -> str:
         velocidad_valor = velocidad_linea.split("Velocidad:")[-1].strip()
 
         await browser.close()
-        return f"El avión más rápido en {region} es {hex_valor} que tiene ahora mismo una velocidad de {velocidad_valor}."
+        return f"El avión más rápido en {region} es {hex_valor} con una velocidad de {velocidad_valor}."
 
-# -------------------------------
-# Herramienta: Explicación emisiones
-# -------------------------------
 @mcp.tool()
 async def explica_consumo_emisiones(pregunta: str) -> str:
     pregunta = pregunta.lower()
-    if (
-        ("emisiones" in pregunta or "co2" in pregunta or "dioxido" in pregunta) and
-        ("consumo" in pregunta or "gasta" in pregunta or "combustible" in pregunta or "litros" in pregunta)
-    ):
+    if ("emisiones" in pregunta or "co2" in pregunta or "dioxido" in pregunta) and ("consumo" in pregunta or "gasta" in pregunta or "combustible" in pregunta or "litros" in pregunta):
         return (
             "Para calcular el consumo de combustible, primero estimamos la resistencia aerodinámica que debe vencer el avión, "
             "la cual depende de la velocidad y la densidad del aire (que varía con la altitud). "
@@ -66,35 +56,24 @@ async def explica_consumo_emisiones(pregunta: str) -> str:
             "Para estimar las emisiones de CO2, multiplicamos la masa total de combustible consumido por un factor de 3.16, "
             "que representa los kilogramos de CO2 emitidos por cada kilogramo de combustible quemado."
         )
-
     if "emisiones" in pregunta or "co2" in pregunta or "dioxido" in pregunta:
         return (
             "Para calcular las emisiones de CO2, primero estimamos cuánto combustible consume el avión durante el vuelo. "
-            "Esto se hace calculando la resistencia aerodinámica que debe vencer el avión, que depende de la velocidad, "
-            "la densidad del aire y características del avión (como tamaño y forma). "
-            "Multiplicamos esta resistencia por el consumo específico de combustible (TSFC), que indica cuántos kg de combustible se queman por segundo para generar esa fuerza. "
-            "Finalmente, multiplicamos el combustible consumido por un factor de 3.16, que es la cantidad de CO2 que se produce al quemar 1 kg de combustible."
+            "Esto se hace calculando la resistencia aerodinámica que debe vencer el avión. "
+            "Multiplicamos esta resistencia por el consumo específico de combustible (TSFC), y finalmente por un factor de 3.16, "
+            "que representa los kg de CO2 generados por cada kg de combustible quemado."
         )
-
     if "consumo" in pregunta or "gasta" in pregunta or "combustible" in pregunta or "litros" in pregunta:
         return (
-            "El consumo de combustible se calcula a partir de la velocidad del avión y la densidad del aire, que cambia con la altitud. "
-            "Primero convertimos la velocidad a metros por segundo y la altitud a metros, "
-            "luego usamos un modelo atmosférico estándar para obtener la densidad del aire. "
-            "Con estos datos, calculamos la resistencia aerodinámica (fuerza que frena al avión). "
-            "Multiplicando esta resistencia por el TSFC (que indica cuánto combustible consume el motor por unidad de fuerza y tiempo), "
-            "obtenemos el flujo de combustible consumido en masa. "
-            "Finalmente, convertimos esa masa a litros por hora usando la densidad del combustible."
+            "El consumo se estima con base en la velocidad, altitud y características del avión. "
+            "Se calcula la resistencia aerodinámica y se multiplica por el TSFC (consumo específico). "
+            "La masa de combustible se convierte a litros según la densidad del combustible usado."
         )
-
     return (
-        "Esta herramienta explica cómo calculamos el consumo de combustible y las emisiones de CO2 de los aviones. "
-        "Puedes preguntar cosas como: '¿Cómo se calcula el consumo de combustible?' o '¿Cómo se obtiene la cantidad de CO2 emitida?'"
+        "Esta herramienta explica cómo se calcula el consumo de combustible y las emisiones de CO2. "
+        "Puedes preguntar cosas como: '¿Cómo se calcula el consumo?' o '¿Cuánto CO2 emite un vuelo?'"
     )
 
-# -------------------------------
-# Herramienta: Origen del vuelo
-# -------------------------------
 @mcp.tool()
 async def origenVuelo(vuelo: str) -> str:
     vuelo = vuelo.strip().upper()
@@ -104,20 +83,15 @@ async def origenVuelo(vuelo: str) -> str:
         browser = await p.chromium.launch()
         page = await browser.new_page()
         await page.goto(url)
-
         try:
             await page.wait_for_selector(".flightPageSummaryCity", timeout=30000)
         except:
             await browser.close()
-            return f"No se pudo obtener la información del vuelo {vuelo}."
-
+            return f"No se pudo obtener el origen del vuelo {vuelo}."
         origen = await page.locator(".flightPageSummaryCity").first.text_content()
         await browser.close()
         return f"Origen: {origen.strip() if origen else 'desconocido'}"
 
-# -------------------------------
-# Herramienta: Destino del vuelo
-# -------------------------------
 @mcp.tool()
 async def destinoVuelo(vuelo: str) -> str:
     vuelo = vuelo.strip().upper()
@@ -127,20 +101,15 @@ async def destinoVuelo(vuelo: str) -> str:
         browser = await p.chromium.launch()
         page = await browser.new_page()
         await page.goto(url)
-
         try:
             await page.wait_for_selector(".flightPageSummaryCity", timeout=30000)
         except:
             await browser.close()
-            return f"No se pudo obtener la información del vuelo {vuelo}."
-
-        origen = await page.locator(".flightPageSummaryCity").first.text_content()
+            return f"No se pudo obtener el destino del vuelo {vuelo}."
+        destino = await page.locator(".flightPageSummaryCity").first.text_content()
         await browser.close()
-        return f"Destino: {origen.strip() if origen else 'desconocido'}"
+        return f"Destino: {destino.strip() if destino else 'desconocido'}"
 
-# -------------------------------
-# Herramienta: Track de vuelo
-# -------------------------------
 @mcp.tool()
 async def trackVuelo(vuelo: str) -> str:
     vuelo = vuelo.strip().upper()
@@ -150,22 +119,17 @@ async def trackVuelo(vuelo: str) -> str:
         browser = await p.chromium.launch()
         page = await browser.new_page()
         await page.goto(url)
-
         try:
             await page.wait_for_selector(".flightPageSummaryCity", timeout=30000)
             await page.wait_for_selector(".destinationCity", timeout=30000)
         except:
             await browser.close()
-            return f"No se pudo obtener la información del vuelo {vuelo}."
-
+            return f"No se pudo obtener el track del vuelo {vuelo}."
         origen = await page.locator(".flightPageSummaryCity").first.text_content()
         destino = await page.locator(".destinationCity").first.text_content()
         await browser.close()
         return f"Origen: {origen.strip() if origen else 'desconocido'} - Destino: {destino.strip() if destino else 'desconocido'}"
 
-# -------------------------------
-# Herramienta: Tiempo total de vuelo
-# -------------------------------
 @mcp.tool()
 async def tiempoVuelo(vuelo: str) -> str:
     vuelo = vuelo.strip().upper()
@@ -175,35 +139,30 @@ async def tiempoVuelo(vuelo: str) -> str:
         browser = await p.chromium.launch()
         page = await browser.new_page()
         await page.goto(url)
-
         try:
             await page.wait_for_selector(".flightPageProgressTotal strong", timeout=30000)
         except:
             await browser.close()
-            return f"No se pudo obtener la información del vuelo {vuelo}."
-
+            return f"No se pudo obtener el tiempo del vuelo {vuelo}."
         tiempo = await page.locator(".flightPageProgressTotal strong").first.text_content()
         await browser.close()
         return f"Tiempo total de vuelo: {tiempo.strip() if tiempo else 'desconocido'}"
 
-# -------------------------------
-# FastAPI: Endpoint /ask
-# -------------------------------
+# ------------------------------- ENDPOINT /ask -------------------------------
+
 class Query(BaseModel):
     prompt: str
 
 @app.post("/ask")
 async def ask(query: Query):
     try:
-        response = await mcp(query.prompt)  # ✅ CORRECTO
+        response = await mcp.run(query.prompt)  # ✅ CORREGIDO
         return {"response": response}
     except Exception as e:
         return {"error": str(e)}
 
+# ------------------------------- UVICORN para Railway -------------------------------
 
-# -------------------------------
-# Uvicorn: Para Railway
-# -------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="127.0.0.1", port=port, reload=True)
