@@ -161,11 +161,22 @@ class Query(BaseModel):
 
 @app.post("/ask")
 async def ask(query: Query):
+    prompt = query.prompt.lower()
     try:
-        response = await mcp.run(query.prompt)
-        return {"response": response}
+        if "avion mas rapido" in prompt:
+            # Extraer región del prompt
+            for region in ["españa", "europa", "américa", "africa", "asia", "oceania"]:
+                if region in prompt:
+                    return {"response": await avion_mas_rapido(region.capitalize())}
+            return {"response": "No se especificó una región válida."}
+        elif "consumo" in prompt or "emisiones" in prompt:
+            return {"response": await explica_consumo_emisiones(prompt)}
+        # Añade más condiciones para otras herramientas...
+        else:
+            return {"response": "No se pudo interpretar la pregunta."}
     except Exception as e:
         return {"error": str(e)}
+
 
 
 # ------------------------------- UVICORN para Railway -------------------------------
