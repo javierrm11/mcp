@@ -141,7 +141,7 @@ async def tiempoVuelo(vuelo: str) -> str:
 
 async def gpt_response(prompt: str) -> str:
     try:
-        response = await openai.ChatCompletion.acreate(
+        response = await openai.chat.completions.acreate(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Responde de forma clara y técnica si es posible."},
@@ -193,4 +193,5 @@ async def ask(query: Query):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
+    import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
