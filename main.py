@@ -10,7 +10,7 @@ import httpx  # para llamadas a la API de Vertex AI
 load_dotenv()
 
 # Clave de API de Vertex AI
-API_KEY = "AIzaSyAa6VPP3RlcL6Jsy72skb7l2KSIuvF9r80"
+API_KEY = "AIzaSyAa6VPP3RlcL6Jsy72skb7l2KSIuvF9r80"  # agrega esta clave en tu .env
 
 mcp = FastMCP()
 app = FastAPI()
