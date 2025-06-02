@@ -4,14 +4,13 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from mcp.server.fastmcp import FastMCP
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
-from google.ai import generativelanguage as generativelanguage
-from google.ai.generativelanguage import types
 from dotenv import load_dotenv
+import httpx  # para llamadas a la API de Vertex AI
 
 load_dotenv()
 
-# Cliente de Vertex AI Generative Language
-client = generativelanguage.GenerationServiceClient()
+# Clave de API de Vertex AI
+API_KEY = os.getenv("GOOGLE_API_KEY")  # agrega esta clave en tu .env
 
 mcp = FastMCP()
 app = FastAPI()
@@ -140,20 +139,23 @@ async def tiempoVuelo(vuelo: str) -> str:
     return f"Tiempo total de vuelo: {tiempo}"
 
 
-# ------------------------------- VERTEX AI FALLBACK -------------------------------
+# ------------------------------- VERTEX AI API KEY HTTP -------------------------------
 
 async def gpt_response(prompt: str) -> str:
-    loop = asyncio.get_event_loop()
-    try:
-        response = await loop.run_in_executor(None, lambda: client.generate_text(
-            model="models/chat-bison-001",
-            prompt=types.TextPrompt(text=prompt),
-            temperature=0.7,
-            max_output_tokens=500,
-        ))
-        return response.candidates[0].output.strip()
-    except Exception as e:
-        return f"Error al consultar Vertex AI: {str(e)}"
+    url = f"https://generativelanguage.googleapis.com/v1beta2/models/chat-bison-001:generateText?key={API_KEY}"
+    data = {
+        "prompt": {"text": prompt},
+        "temperature": 0.7,
+        "maxOutputTokens": 500
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(url, json=data)
+            response.raise_for_status()
+            result = response.json()
+            return result["candidates"][0]["output"].strip()
+        except Exception as e:
+            return f"Error al consultar Vertex AI: {str(e)}"
 
 
 # ------------------------------- API /ask -------------------------------
